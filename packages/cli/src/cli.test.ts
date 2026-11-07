@@ -2,7 +2,18 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import type { Message } from '@chat-bridge/types';
 import { executeCli } from './cli.js';
+import { CliContext } from './config.js';
+import {
+  evaluateAppHealth,
+  SLOW_QUEUE_THRESHOLD,
+  SLOW_CPU_PERCENT_THRESHOLD,
+  PROBLEM_CPU_PERCENT_THRESHOLD,
+  SLOW_MEMORY_MB_THRESHOLD,
+  PROBLEM_MEMORY_MB_THRESHOLD,
+  PROBLEM_ERROR_COUNT_THRESHOLD,
+} from './commands/status.js';
 
 describe('US-I1-01: Developer and QA Command-Line Interface (CLI) Parity', () => {
   let tempDir: string;
@@ -283,6 +294,295 @@ describe('US-I1-01: Developer and QA Command-Line Interface (CLI) Parity', () =>
         'Unknown command: "statusxyz". Run "chat-bridge --help" for available commands.'
       );
       expect(parsedWithout).not.toHaveProperty('suggestion');
+    });
+  });
+
+  describe('Scenario 11: App health telemetry and verdict (Spec C-9)', () => {
+    function makeSyntheticMessage(index: number): Message {
+      return {
+        id: `fake:test-account:msg-${index}`,
+        network: 'fake',
+        account: 'test-account',
+        thread: 'thread-dm-synthetic-1',
+        threadKind: 'dm',
+        direction: 'inbound',
+        time: new Date().toISOString(),
+        from: {
+          accountId: 'synthetic-sender-1',
+          displayName: 'Synthetic Contact',
+        },
+        to: [
+          {
+            accountId: 'test-account',
+            displayName: 'Synthetic Rep',
+          },
+        ],
+        text: `Synthetic test message ${index}`,
+      };
+    }
+
+    it('returns cpuPercent, messagesPerMinute, errorCount, and health in status --json telemetry', async () => {
+      const result = await executeCli(['status', '--json'], { dataDir: tempDir });
+      expect(result.exitCode).toBe(0);
+
+      const parsed = JSON.parse(result.stdout);
+      expect(typeof parsed.telemetry.memoryUsageMb).toBe('number');
+      expect(typeof parsed.telemetry.uptimeSeconds).toBe('number');
+      expect(typeof parsed.telemetry.cpuPercent).toBe('number');
+      expect(parsed.telemetry.cpuPercent).toBeGreaterThanOrEqual(0);
+      expect(parsed.telemetry.messagesPerMinute).toBe(0);
+      expect(parsed.telemetry.errorCount).toBe(0);
+      expect(parsed.telemetry.health).toBe('good');
+    });
+
+    it('counts recent messagesPerMinute and errorCount from outbox state', async () => {
+      const ctx = new CliContext(tempDir);
+      const settings = ctx.getSettings();
+      settings.sinks['archive'] = {
+        type: 'archive',
+        enabled: true,
+        config: { directory: path.join(tempDir, 'archive') },
+      };
+      ctx.saveSettings(settings);
+
+      const outbox = ctx.getOutbox();
+      await outbox.enqueue(makeSyntheticMessage(1), ['archive']);
+      await outbox.enqueue(makeSyntheticMessage(2), ['archive']);
+      const pending = await outbox.getPendingDeliveries('archive', 10);
+      await outbox.markFailed(pending[0]!.deliveryId, 'Simulated transient write error');
+      outbox.close();
+      ctx.close();
+
+      const result = await executeCli(['status', '--json'], { dataDir: tempDir });
+      expect(result.exitCode).toBe(0);
+
+      const parsed = JSON.parse(result.stdout);
+      expect(parsed.telemetry.messagesPerMinute).toBe(2);
+      expect(parsed.telemetry.errorCount).toBe(1);
+    });
+
+    it('exports named threshold constants for health classification', () => {
+      expect(typeof SLOW_QUEUE_THRESHOLD).toBe('number');
+      expect(SLOW_QUEUE_THRESHOLD).toBeGreaterThan(0);
+
+      expect(typeof SLOW_CPU_PERCENT_THRESHOLD).toBe('number');
+      expect(typeof PROBLEM_CPU_PERCENT_THRESHOLD).toBe('number');
+      expect(SLOW_CPU_PERCENT_THRESHOLD).toBeGreaterThan(0);
+      expect(PROBLEM_CPU_PERCENT_THRESHOLD).toBeGreaterThan(SLOW_CPU_PERCENT_THRESHOLD);
+
+      expect(typeof SLOW_MEMORY_MB_THRESHOLD).toBe('number');
+      expect(typeof PROBLEM_MEMORY_MB_THRESHOLD).toBe('number');
+      expect(SLOW_MEMORY_MB_THRESHOLD).toBeGreaterThan(0);
+      expect(PROBLEM_MEMORY_MB_THRESHOLD).toBeGreaterThan(SLOW_MEMORY_MB_THRESHOLD);
+
+      expect(typeof PROBLEM_ERROR_COUNT_THRESHOLD).toBe('number');
+      expect(PROBLEM_ERROR_COUNT_THRESHOLD).toBeGreaterThan(0);
+    });
+
+    it('evaluates unit health verdicts for good, slow, and problem states', () => {
+      expect(
+        evaluateAppHealth({
+          sinks: {
+            archive: { health: 'ok', reason: 'Active' },
+          },
+          outbox: {
+            archive: {
+              pendingCount: SLOW_QUEUE_THRESHOLD,
+              inFlightCount: 0,
+              deadLetterCount: 0,
+            },
+          },
+          cpuPercent: SLOW_CPU_PERCENT_THRESHOLD - 1,
+          memoryUsageMb: SLOW_MEMORY_MB_THRESHOLD - 10,
+          errorCount: 0,
+        })
+      ).toBe('good');
+
+      // Slow when any sink is degraded
+      expect(
+        evaluateAppHealth({
+          sinks: {
+            archive: { health: 'ok', reason: 'Active' },
+            margince: { health: 'degraded', reason: 'Rate limited' },
+          },
+          outbox: {},
+          cpuPercent: 1,
+          memoryUsageMb: 50,
+          errorCount: 0,
+        })
+      ).toBe('slow');
+
+      // Slow when queue keeps growing past SLOW_QUEUE_THRESHOLD
+      expect(
+        evaluateAppHealth({
+          sinks: {
+            archive: { health: 'ok', reason: 'Active' },
+          },
+          outbox: {
+            archive: {
+              pendingCount: SLOW_QUEUE_THRESHOLD + 1,
+              inFlightCount: 0,
+              deadLetterCount: 0,
+            },
+          },
+          cpuPercent: 1,
+          memoryUsageMb: 50,
+          errorCount: 0,
+        })
+      ).toBe('slow');
+
+      // Slow when CPU or memory crosses slow threshold
+      expect(
+        evaluateAppHealth({
+          sinks: { archive: { health: 'ok', reason: 'Active' } },
+          outbox: {},
+          cpuPercent: SLOW_CPU_PERCENT_THRESHOLD,
+          memoryUsageMb: 50,
+          errorCount: 0,
+        })
+      ).toBe('slow');
+
+      expect(
+        evaluateAppHealth({
+          sinks: { archive: { health: 'ok', reason: 'Active' } },
+          outbox: {},
+          cpuPercent: 1,
+          memoryUsageMb: SLOW_MEMORY_MB_THRESHOLD,
+          errorCount: 0,
+        })
+      ).toBe('slow');
+
+      // Problem when any sink is down (even if another sink is degraded or queue is growing)
+      expect(
+        evaluateAppHealth({
+          sinks: {
+            archive: { health: 'degraded', reason: 'Paused' },
+            margince: { health: 'down', reason: 'Endpoint unreachable' },
+          },
+          outbox: {
+            archive: {
+              pendingCount: SLOW_QUEUE_THRESHOLD + 50,
+              inFlightCount: 0,
+              deadLetterCount: 0,
+            },
+          },
+          cpuPercent: 1,
+          memoryUsageMb: 50,
+          errorCount: 0,
+        })
+      ).toBe('problem');
+
+      // Problem when CPU, memory, or errorCount crosses problem threshold
+      expect(
+        evaluateAppHealth({
+          sinks: { archive: { health: 'ok', reason: 'Active' } },
+          outbox: {},
+          cpuPercent: PROBLEM_CPU_PERCENT_THRESHOLD + 1,
+          memoryUsageMb: 50,
+          errorCount: 0,
+        })
+      ).toBe('problem');
+
+      expect(
+        evaluateAppHealth({
+          sinks: { archive: { health: 'ok', reason: 'Active' } },
+          outbox: {},
+          cpuPercent: 1,
+          memoryUsageMb: PROBLEM_MEMORY_MB_THRESHOLD + 1,
+          errorCount: 0,
+        })
+      ).toBe('problem');
+
+      expect(
+        evaluateAppHealth({
+          sinks: { archive: { health: 'ok', reason: 'Active' } },
+          outbox: {},
+          cpuPercent: 1,
+          memoryUsageMb: 50,
+          errorCount: PROBLEM_ERROR_COUNT_THRESHOLD,
+        })
+      ).toBe('problem');
+    });
+
+    it('prints one plain "App health: <verdict>" line for good, slow, and problem verdicts', async () => {
+      // 1. Good verdict on healthy system
+      const goodPlain = await executeCli(['status'], { dataDir: tempDir });
+      expect(goodPlain.exitCode).toBe(0);
+      const goodHealthLines = goodPlain.stdout
+        .split('\n')
+        .filter((line) => line.startsWith('App health:'));
+      expect(goodHealthLines).toEqual(['App health: good']);
+
+      // 2. Slow verdict when a sink is degraded
+      const ctxSlow = new CliContext(tempDir);
+      const slowSettings = ctxSlow.getSettings();
+      slowSettings.sinks['archive'] = {
+        type: 'archive',
+        enabled: false,
+        config: { directory: path.join(tempDir, 'archive') },
+      };
+      ctxSlow.saveSettings(slowSettings);
+      ctxSlow.close();
+
+      const slowPlain = await executeCli(['status'], { dataDir: tempDir });
+      expect(slowPlain.exitCode).toBe(0);
+      const slowHealthLines = slowPlain.stdout
+        .split('\n')
+        .filter((line) => line.startsWith('App health:'));
+      expect(slowHealthLines).toEqual(['App health: slow']);
+
+      const slowJson = await executeCli(['status', '--json'], { dataDir: tempDir });
+      expect(JSON.parse(slowJson.stdout).telemetry.health).toBe('slow');
+
+      // 3. Slow verdict when queue keeps growing past threshold on an active sink
+      const ctxGrowing = new CliContext(tempDir);
+      const growingSettings = ctxGrowing.getSettings();
+      growingSettings.sinks['archive'] = {
+        type: 'archive',
+        enabled: true,
+        config: { directory: path.join(tempDir, 'archive') },
+      };
+      ctxGrowing.saveSettings(growingSettings);
+      const outboxGrowing = ctxGrowing.getOutbox();
+      const targetQueueCount = (SLOW_QUEUE_THRESHOLD ?? 100) + 1;
+      for (let i = 1; i <= targetQueueCount; i++) {
+        await outboxGrowing.enqueue(makeSyntheticMessage(i), ['archive']);
+      }
+      outboxGrowing.close();
+      ctxGrowing.close();
+
+      const growingJson = await executeCli(['status', '--json'], { dataDir: tempDir });
+      expect(JSON.parse(growingJson.stdout).telemetry.health).toBe('slow');
+
+      // 4. Problem verdict when a sink is down (permanent delivery refusal / down state)
+      const ctxProblem = new CliContext(tempDir);
+      const problemSettings = ctxProblem.getSettings();
+      problemSettings.sinks['archive'] = {
+        type: 'archive',
+        enabled: true,
+        config: { directory: path.join(tempDir, 'archive'), health: 'down' },
+      };
+      ctxProblem.saveSettings(problemSettings);
+      const outboxProblem = ctxProblem.getOutbox();
+      const pendingDeliveries = await outboxProblem.getPendingDeliveries('archive', 1);
+      if (pendingDeliveries[0]) {
+        await outboxProblem.markRefused(
+          pendingDeliveries[0].deliveryId,
+          'Destination permanently unreachable'
+        );
+      }
+      outboxProblem.close();
+      ctxProblem.close();
+
+      const problemPlain = await executeCli(['status'], { dataDir: tempDir });
+      expect(problemPlain.exitCode).toBe(0);
+      const problemHealthLines = problemPlain.stdout
+        .split('\n')
+        .filter((line) => line.startsWith('App health:'));
+      expect(problemHealthLines).toEqual(['App health: problem']);
+
+      const problemJson = await executeCli(['status', '--json'], { dataDir: tempDir });
+      expect(JSON.parse(problemJson.stdout).telemetry.health).toBe('problem');
     });
   });
 });
