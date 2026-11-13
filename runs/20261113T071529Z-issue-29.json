@@ -1,0 +1,176 @@
+{
+  "schema": 1,
+  "issue": 29,
+  "title": "Archive sink writes forwarded messages to daily JSONL files (US-K1-01)",
+  "labels": [
+    "agent:needs-human"
+  ],
+  "runner": "claude-code in docker (claude 2.1.323)",
+  "model": "claude-opus-5-5",
+  "startedAt": "2026-11-13T07:08:19.018Z",
+  "finishedAt": "2026-11-13T07:15:29.067Z",
+  "outcome": "passed",
+  "phases": [
+    {
+      "phase": "green",
+      "passed": true,
+      "attempts": [
+        {
+          "attempt": 1,
+          "agentExitCode": 0,
+          "usage": {
+            "input": 1087561,
+            "cachedInput": 1042120,
+            "output": 9480,
+            "total": 1097041,
+            "requests": 23
+          },
+          "toolCalls": {
+            "Bash": 21,
+            "Write": 1,
+            "Edit": 1
+          },
+          "gates": [
+            {
+              "name": "sandbox setup",
+              "status": "fail",
+              "durationMs": 4303
+            },
+            {
+              "name": "build",
+              "status": "skipped",
+              "durationMs": 0
+            },
+            {
+              "name": "guard",
+              "status": "skipped",
+              "durationMs": 0
+            },
+            {
+              "name": "test",
+              "status": "skipped",
+              "durationMs": 0
+            },
+            {
+              "name": "e2e",
+              "status": "skipped",
+              "durationMs": 0
+            }
+          ],
+          "protectedPathViolations": [],
+          "lockedTestEdits": [
+            "packages/sinks/archive/package.json"
+          ],
+          "outOfScopeFiles": [],
+          "failure": "gate:sandbox setup"
+        },
+        {
+          "attempt": 2,
+          "agentExitCode": 0,
+          "usage": {
+            "input": 341097,
+            "cachedInput": 313000,
+            "output": 2596,
+            "total": 343693,
+            "requests": 10
+          },
+          "toolCalls": {
+            "Bash": 9
+          },
+          "gates": [
+            {
+              "name": "sandbox setup",
+              "status": "fail",
+              "durationMs": 3677
+            },
+            {
+              "name": "build",
+              "status": "skipped",
+              "durationMs": 0
+            },
+            {
+              "name": "guard",
+              "status": "skipped",
+              "durationMs": 0
+            },
+            {
+              "name": "test",
+              "status": "skipped",
+              "durationMs": 0
+            },
+            {
+              "name": "e2e",
+              "status": "skipped",
+              "durationMs": 0
+            }
+          ],
+          "protectedPathViolations": [],
+          "lockedTestEdits": [
+            "packages/sinks/archive/package.json"
+          ],
+          "outOfScopeFiles": [],
+          "failure": "gate:sandbox setup"
+        },
+        {
+          "attempt": 3,
+          "agentExitCode": 0,
+          "usage": {
+            "input": 466950,
+            "cachedInput": 437653,
+            "output": 4646,
+            "total": 471596,
+            "requests": 13
+          },
+          "toolCalls": {
+            "Bash": 12
+          },
+          "gates": [
+            {
+              "name": "build",
+              "status": "pass",
+              "durationMs": 9138
+            },
+            {
+              "name": "guard",
+              "status": "pass",
+              "durationMs": 5466
+            },
+            {
+              "name": "test",
+              "status": "pass",
+              "durationMs": 13339
+            },
+            {
+              "name": "e2e",
+              "status": "pass",
+              "durationMs": 6129
+            }
+          ],
+          "protectedPathViolations": [],
+          "lockedTestEdits": [],
+          "outOfScopeFiles": []
+        }
+      ]
+    }
+  ],
+  "usage": {
+    "input": 1895608,
+    "cachedInput": 1792773,
+    "output": 16722,
+    "total": 1912330,
+    "requests": 46
+  },
+  "costUsd": null,
+  "caughtBy": [
+    "locked-tests",
+    "sandbox setup",
+    "locked-tests",
+    "sandbox setup",
+    "plan-drift"
+  ],
+  "firstPass": false,
+  "stage": "build",
+  "unplannedFiles": [
+    "pnpm-lock.yaml"
+  ]
+}
