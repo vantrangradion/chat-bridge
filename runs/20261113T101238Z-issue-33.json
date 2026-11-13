@@ -1,0 +1,55 @@
+{
+  "schema": 1,
+  "issue": 33,
+  "title": "Archive day files are named by UTC day and hold one JSON message per line (US-K1-01, part 1)",
+  "labels": [],
+  "runner": "claude-code in docker (claude 2.1.323)",
+  "model": "claude-opus-5-5",
+  "startedAt": "2026-11-13T10:11:08.156Z",
+  "finishedAt": "2026-11-13T10:12:38.098Z",
+  "outcome": "plan-ready",
+  "phases": [
+    {
+      "phase": "red",
+      "passed": true,
+      "attempts": [
+        {
+          "attempt": 1,
+          "agentExitCode": 0,
+          "usage": {
+            "input": 166557,
+            "cachedInput": 145990,
+            "output": 3616,
+            "total": 170173,
+            "requests": 6
+          },
+          "toolCalls": {
+            "Bash": 5,
+            "Write": 1
+          },
+          "gates": [
+            {
+              "name": "test",
+              "status": "fail",
+              "durationMs": 20941
+            }
+          ],
+          "protectedPathViolations": [],
+          "lockedTestEdits": [],
+          "outOfScopeFiles": []
+        }
+      ]
+    }
+  ],
+  "usage": {
+    "input": 166557,
+    "cachedInput": 145990,
+    "output": 3616,
+    "total": 170173,
+    "requests": 6
+  },
+  "costUsd": null,
+  "caughtBy": [],
+  "firstPass": true,
+  "stage": "plan"
+}
