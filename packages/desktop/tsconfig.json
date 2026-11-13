@@ -15,6 +15,7 @@
     { "path": "../../packages/sources/fake" },
     { "path": "../../packages/sources/whatsapp" },
     { "path": "../../packages/sources/zalo" },
+    { "path": "../../packages/sinks/archive" },
     { "path": "../../packages/sinks/margince" }
   ]
 }
