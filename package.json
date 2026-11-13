@@ -21,6 +21,8 @@
     "@agentic-factory/guards": "^1.2.0",
     "@agentic-factory/harness": "^1.0.0",
     "@agentic-factory/loop": "^0.3.0",
+    "@chat-bridge/testing": "workspace:*",
+    "@chat-bridge/types": "workspace:*",
     "@playwright/test": "1.64.1",
     "@types/node": "^22.10.1",
     "@vitest/coverage-v8": "^2.1.8",
