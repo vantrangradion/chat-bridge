@@ -1,0 +1,90 @@
+{
+  "schema": 1,
+  "issue": 34,
+  "title": "Archive reads the message ids already stored in its folder (US-K1-01, part 2)",
+  "labels": [
+    "agent:plan-review"
+  ],
+  "runner": "claude-code in docker (claude 2.1.323)",
+  "model": "claude-opus-5-5",
+  "startedAt": "2026-11-13T10:35:46.620Z",
+  "finishedAt": "2026-11-13T10:36:05.951Z",
+  "outcome": "needs-human",
+  "phases": [
+    {
+      "phase": "green",
+      "passed": false,
+      "attempts": [
+        {
+          "attempt": 1,
+          "agentExitCode": 1,
+          "agentError": "Agent reported an error: You've hit your weekly limit · resets 8am (UTC)",
+          "usage": {
+            "input": 0,
+            "cachedInput": 0,
+            "output": 0,
+            "total": 0,
+            "requests": 1
+          },
+          "toolCalls": {},
+          "gates": [],
+          "protectedPathViolations": [],
+          "lockedTestEdits": [],
+          "outOfScopeFiles": [],
+          "failure": "no-changes"
+        },
+        {
+          "attempt": 2,
+          "agentExitCode": 1,
+          "agentError": "Agent reported an error: You've hit your weekly limit · resets 8am (UTC)",
+          "usage": {
+            "input": 0,
+            "cachedInput": 0,
+            "output": 0,
+            "total": 0,
+            "requests": 1
+          },
+          "toolCalls": {},
+          "gates": [],
+          "protectedPathViolations": [],
+          "lockedTestEdits": [],
+          "outOfScopeFiles": [],
+          "failure": "no-changes"
+        },
+        {
+          "attempt": 3,
+          "agentExitCode": 1,
+          "agentError": "Agent reported an error: You've hit your weekly limit · resets 8am (UTC)",
+          "usage": {
+            "input": 0,
+            "cachedInput": 0,
+            "output": 0,
+            "total": 0,
+            "requests": 1
+          },
+          "toolCalls": {},
+          "gates": [],
+          "protectedPathViolations": [],
+          "lockedTestEdits": [],
+          "outOfScopeFiles": [],
+          "failure": "no-changes"
+        }
+      ]
+    }
+  ],
+  "usage": {
+    "input": 0,
+    "cachedInput": 0,
+    "output": 0,
+    "total": 0,
+    "requests": 3
+  },
+  "costUsd": null,
+  "caughtBy": [
+    "agent-error",
+    "agent-error",
+    "agent-error"
+  ],
+  "firstPass": false,
+  "stage": "build"
+}
